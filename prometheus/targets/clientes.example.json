@@ -1,0 +1,4 @@
+[
+  { "targets": ["https://cliente-a.exemplo.com/api/health"], "labels": { "slug": "cliente-a" } },
+  { "targets": ["https://cliente-b.exemplo.com/api/health"], "labels": { "slug": "cliente-b" } }
+]

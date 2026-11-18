@@ -1,0 +1,16 @@
+# Instalar em ~/.config/systemd/user/ e ativar:
+#   systemctl --user daemon-reload && systemctl --user enable --now exportador-dominios.service
+# Sem root: porta alta (9250), escuta só em 127.0.0.1.
+[Unit]
+Description=Exportador de vencimento de dominio (RDAP)
+After=network-online.target
+
+[Service]
+Type=simple
+Environment=DOMINIOS=exemplo.com,exemplo.com.br
+ExecStart=/usr/bin/python3 %h/observabilidade-vps/exporters/dominios/exportador-dominios.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

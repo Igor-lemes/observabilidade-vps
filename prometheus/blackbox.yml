@@ -1,0 +1,15 @@
+# Blackbox exporter: só os módulos usados. O módulo http_2xx alimenta as
+# sondas de cliente e de domínio.
+modules:
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      preferred_ip_protocol: ip4
+  tcp_connect:
+    prober: tcp
+  ssh_banner:
+    prober: tcp
+    tcp:
+      query_response:
+        - expect: "^SSH-2.0-"

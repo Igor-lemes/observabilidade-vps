@@ -1,0 +1,81 @@
+groups:
+  - name: infra
+    rules:
+      # `up` é escrito pelo próprio Prometheus a cada scrape, então existe
+      # mesmo quando o alvo está morto. É a única forma de o monitoramento
+      # perceber a própria falta de monitoramento: as regras que dependem de
+      # probe_success não disparam quando o blackbox_exporter está fora, pois
+      # a métrica simplesmente deixa de existir (ausente, não igual a 0).
+      - alert: ExportadorForaDoAr
+        expr: up == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "Alvo {{ $labels.job }}/{{ $labels.instance }} fora do ar há mais de 5 minutos"
+
+      - alert: ClienteForaDoAr
+        expr: probe_success{job="blackbox-clientes"} == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "Cliente {{ $labels.slug }} fora do ar há mais de 5 minutos"
+
+      - alert: ControlPlaneForaDoAr
+        expr: probe_success{job="blackbox-sistema"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "API do control plane fora do ar há mais de 2 minutos"
+
+      - alert: CPUAlta
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "CPU de {{ $labels.instance }} acima de 85% por mais de 5 minutos"
+
+      - alert: RAMAlta
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "RAM de {{ $labels.instance }} acima de 85% por mais de 5 minutos"
+
+      - alert: DiscoAlto
+        expr: (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 85
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Disco de {{ $labels.instance }} acima de 85% por mais de 5 minutos"
+
+      # Registro do domínio (RDAP) e certificado TLS vencem em datas
+      # diferentes. O certificado costuma vencer antes e derruba o site na
+      # hora; o domínio é mais raro, porém mais grave (perde-se o nome).
+      # Aviso em 30 dias e de novo em 7, com severidade maior.
+      - alert: DominioVenceEm30Dias
+        expr: dominio_dias_para_vencer < 30
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Domínio {{ $labels.dominio }} vence em menos de 30 dias"
+
+      - alert: DominioVenceEm7Dias
+        expr: dominio_dias_para_vencer < 7
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "Domínio {{ $labels.dominio }} vence em menos de 7 dias"
+
+      - alert: CertificadoVenceEm30Dias
+        expr: (probe_ssl_earliest_cert_expiry{job="blackbox-dominios"} - time()) / 86400 < 30
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Certificado TLS de {{ $labels.instance }} vence em menos de 30 dias"
+
+      - alert: CertificadoVenceEm7Dias
+        expr: (probe_ssl_earliest_cert_expiry{job="blackbox-dominios"} - time()) / 86400 < 7
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "Certificado TLS de {{ $labels.instance }} vence em menos de 7 dias"

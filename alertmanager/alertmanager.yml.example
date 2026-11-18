@@ -1,0 +1,21 @@
+# Exemplo. O token real nunca entra no repositório: fica só em
+# /etc/alertmanager/alertmanager.yml (modo 0640) no servidor.
+global: {}
+
+route:
+  group_by: ['alertname', 'slug']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 3h
+  receiver: telegram
+
+receivers:
+  - name: telegram
+    telegram_configs:
+      - bot_token: 'BOT_TOKEN_AQUI'
+        chat_id: -1000000000000
+        parse_mode: 'HTML'
+        message: |
+          {{ range .Alerts }}<b>{{ .Labels.alertname }}</b> ({{ .Status }})
+          {{ .Annotations.summary }}
+          {{ end }}

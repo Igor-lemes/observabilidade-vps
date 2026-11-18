@@ -1,0 +1,78 @@
+# Prometheus: configuração de exemplo (hosts e domínios fictícios).
+# 10.0.0.10 = VPS de monitoramento (dev), 10.0.0.20 = VPS de produção,
+# ambas numa rede privada (ex.: Tailscale).
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: vps-monitor
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['10.0.0.10:9093']
+
+rule_files:
+  - alert.rules.yml
+
+scrape_configs:
+  - job_name: prometheus
+    scrape_interval: 5s
+    scrape_timeout: 5s
+    static_configs:
+      - targets: ['10.0.0.10:9090']
+
+  # Métricas de caixa-branca das duas VPS (node_exporter).
+  - job_name: node
+    static_configs:
+      - targets: ['10.0.0.10:9100']
+        labels: { vps: dev }
+      - targets: ['10.0.0.20:9100']
+        labels: { vps: producao }
+
+  # Caixa-preta: uma sonda HTTP por instância de cliente. A lista de alvos é
+  # gerada a partir do inventário (ver provisionador-multicliente,
+  # scripts/gerar-targets-prometheus.py); nunca é editada à mão.
+  - job_name: blackbox-clientes
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    file_sd_configs:
+      - files: ['/etc/prometheus/targets/clientes.json']
+    relabel_configs: &blackbox_relabel
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 10.0.0.10:9115   # endereço do blackbox_exporter
+
+  # Sonda do próprio control plane.
+  - job_name: blackbox-sistema
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets: ['http://127.0.0.1:8090/']
+        labels: { slug: control-plane }
+    relabel_configs: *blackbox_relabel
+
+  # Sonda HTTPS dos domínios: o blackbox já publica
+  # probe_ssl_earliest_cert_expiry, usado nos alertas de certificado.
+  - job_name: blackbox-dominios
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - 'https://exemplo.com'
+          - 'https://app.exemplo.com'
+          - 'https://exemplo.com.br'
+    relabel_configs: *blackbox_relabel
+
+  # Vencimento do REGISTRO do domínio (RDAP), diferente do certificado.
+  # O exportador roda em loopback de propósito: não depende da interface da
+  # VPN subir antes dele (ver systemd/ e a decisão 3 do README).
+  - job_name: dominios-expiracao
+    static_configs:
+      - targets: ['127.0.0.1:9250']
